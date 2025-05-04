@@ -12,6 +12,9 @@ const nextCheckTimer = document.getElementById('next-check-timer');
 // Выбор типа прокси
 const proxyTypeSelect = document.getElementById('proxyTypeSelect');
 
+// Блок обновления
+const updateNotice = document.getElementById('updateNotice');
+
 // Переключение вкладок
 document.querySelectorAll('.tab').forEach(tab => {
   tab.addEventListener('click', () => {
@@ -164,43 +167,52 @@ function fetchLivePing() {
     });
   });
 }
-// Проверка обновлений
-async function checkForUpdate() {
-    try {
-        const response = await fetch('https://risaro.github.io/garage-proxy/version.json');
-        const remote = await response.json();
 
-        const currentVersion = chrome.runtime.getManifest().version;
-        const latestVersion = remote.version;
-
-        if (compareVersions(currentVersion, latestVersion) < 0) {
-            document.getElementById('updateNotice').style.display = 'block';
-            document.getElementById('downloadLink').href = remote.download_url;
-            document.getElementById('changelog').innerText = remote.changelog;
-        }
-    } catch (e) {
-        console.error("Ошибка проверки обновления:", e);
-    }
-}
-
-function compareVersions(v1, v2) {
-    const parts1 = v1.split('.').map(Number);
-    const parts2 = v2.split('.').map(Number);
-
-    for (let i = 0; i < 3; i++) {
-        if (parts1[i] > parts2[i]) return 1;
-        if (parts1[i] < parts2[i]) return -1;
-    }
-    return 0;
-}
-
-// Показываем уведомление о обновлении
-document.getElementById('updateNotice').innerHTML = `
-    <h3>Доступно обновление</h3>
-    <p id="changelog"></p>
-    <a id="downloadLink" href="#" target="_blank">📥 Скачать новую версию</a>
-`;
-
-checkForUpdate();
 setInterval(fetchLivePing, 5000);
-fetchLivePing(); // сразу при загрузкеч
+fetchLivePing(); // сразу при загрузке
+
+// === Автообновление расширения ===
+
+// Проверка обновлений при загрузке popup
+window.addEventListener('load', checkForUpdate);
+
+// Функция сравнения версий
+function compareVersions(v1, v2) {
+  const parts1 = v1.split('.').map(Number);
+  const parts2 = v2.split('.').map(Number);
+
+  for (let i = 0; i < 3; i++) {
+    if (parts1[i] > parts2[i]) return 1;
+    if (parts1[i] < parts2[i]) return -1;
+  }
+  return 0;
+}
+
+// Проверка обновления
+async function checkForUpdate() {
+  try {
+    const response = await fetch('https://risaro.github.io/garage-proxy/version.json');
+    const remote = await response.json();
+
+    const currentVersion = chrome.runtime.getManifest().version;
+    const latestVersion = remote.version;
+
+    if (compareVersions(currentVersion, latestVersion) < 0) {
+      showUpdateNotification(remote);
+    }
+  } catch (e) {
+    console.error("Ошибка проверки обновления:", e);
+  }
+}
+
+// Показываем уведомление об обновлении
+function showUpdateNotification(data) {
+  updateNotice.style.display = 'block';
+  updateNotice.innerHTML = `
+    <h3>🆕 Доступно обновление</h3>
+    <p><strong>Текущая:</strong> ${chrome.runtime.getManifest().version}</p>
+    <p><strong>Новая:</strong> ${data.version}</p>
+    <p id="changelog">${data.changelog}</p>
+    <a id="downloadLink" href="${data.download_url}" target="_blank">📥 Скачать новую версию</a>
+  `;
+}
