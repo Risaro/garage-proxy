@@ -1,4 +1,4 @@
-name: Build & Deploy ZIP
+name: Build & Deploy ZIP to GitHub Pages
 
 on:
   push:
@@ -29,5 +29,7 @@ jobs:
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          upload_files: release.zip
+          publish_dir: ./
+          files_to_publish:
+            - release.zip
           commit_message: Update release.zip
