@@ -1,4 +1,4 @@
-name: Build & Deploy ZIP to GitHub Pages
+name: Build & Release ZIP
 
 on:
   push:
@@ -25,16 +25,15 @@ jobs:
             manifest.json \
             icon.png
 
-      - name: Setup Git
-        run: |
-          git config --global user.email "github-actions@example.com"
-          git config --global user.name "GitHub Actions"
+      - name: Upload ZIP as artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: release
+          path: release.zip
 
-      - name: Clone gh-pages branch
-        run: |
-          git clone --single-branch --branch gh-pages https://github.com/${{ github.repository }}
-          cd pages
-          cp ../release.zip .
-          git add release.zip
-          git commit -m "Update release.zip"
-          git push origin gh-pages
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          upload_files: release.zip
+          commit_message: ${{ github.workflow }}@${{ github.ref }}
