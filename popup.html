@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>GarageTesla Proxy</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div class="cyber-container">
+
+    <!-- Логотип -->
+    <div class="logo-wrapper">
+      <img src="icon.png" alt="Логотип GarageTesla Proxy" class="logo">
+    </div>
+
+    <!-- Вкладки -->
+    <div class="tabs">
+      <button class="tab active" data-tab="main">🔌 Основное</button>
+      <button class="tab" data-tab="about">ℹ О нас</button>
+    </div>
+
+    <!-- Основная вкладка -->
+    <div id="main" class="tab-content active">
+      <h1>GarageTesla Proxy</h1>
+
+      <!-- Выбор типа прокси -->
+      <label for="proxyTypeSelect">Тип прокси:</label>
+      <select id="proxyTypeSelect">
+        <option value="http">HTTP</option>
+        <option value="socks5">SOCKS5</option>
+      </select>
+
+      <br><br>
+
+      <button id="toggleBtn">Включить</button>
+      <p id="status">Статус: отключено</p>
+
+      <div id="health-status">
+        <p><strong>Состояние:</strong> <span id="connection-status">Неизвестно</span></p>
+        <p><strong>Последний пинг:</strong> <span id="ping-result">-</span></p>
+        <p><strong>Следующая проверка:</strong> <span id="next-check-timer">-</span></p>
+      </div>
+
+      <div id="ip-info" class="hidden">
+        <p><strong>Предыдущий IP:</strong> <span id="prev-ip">-</span></p>
+        <p><strong>Текущий IP:</strong> <span id="curr-ip">-</span></p>
+      </div>
+    </div>
+
+    <!-- Вкладка "О нас" -->
+    <div id="about" class="tab-content hidden">
+      <h2>ℹ О GarageTesla Proxy</h2>
+      <p>Приветствуем в будущем интернета.</p>
+      <p>Мы — команда GarageTesla, создаём инструменты для безопасного и свободного серфинга в сети.</p>
+      <p>Это расширение позволяет вам легко включать/выключать прокси и проверять ваш текущий IP.</p>
+      <p>Связь: <a href="mailto:support@garagetesla.com" target="_blank">support@garagetesla.com</a></p>
+    </div>
+
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

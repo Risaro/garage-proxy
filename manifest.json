@@ -1,0 +1,28 @@
+{
+  "name": "GarageTesla Proxy",
+  "version": "1.0",
+  "description": "Прокси через Chrome Extension с авто-восстановлением.",
+  "manifest_version": 3,
+
+  "host_permissions": ["<all_urls>", "https://api.ipify.org/*"],
+  "permissions": [
+    "proxy",
+    "storage",
+    "webRequest",
+    "webRequestBlocking",
+    "scripting"
+  ],
+
+  "background": {
+    "service_worker": "background.js"
+  },
+
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": "icon.png"
+  },
+
+  "icons": {
+    "128": "icon.png"
+  }
+}
