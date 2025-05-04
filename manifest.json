@@ -10,7 +10,8 @@
     "storage",
     "webRequest",
     "webRequestBlocking",
-    "scripting"
+    "scripting",
+    "management"
   ],
 
   "background": {
