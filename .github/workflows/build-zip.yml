@@ -1,4 +1,4 @@
-name: Build & Deploy ZIP to GitHub Pages
+name: Build & Update release.zip
 
 on:
   push:
@@ -25,11 +25,20 @@ jobs:
             manifest.json \
             icon.png
 
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./
-          files_to_publish:
-            - release.zip
-          commit_message: Update release.zip
+      - name: Commit and Push updated release.zip
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+
+          # Перемещаем сгенерированный ZIP на место
+          mv release.zip ./release.zip
+
+          # Добавляем только release.zip в git
+          git add ./release.zip
+
+          # Проверяем, есть ли изменения для коммита
+          git diff --staged --quiet || git diff --quiet && echo "Нет изменений в release.zip" && exit 0
+
+          git commit -m "Update release.zip"
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
+          git push origin main
