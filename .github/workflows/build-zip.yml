@@ -1,4 +1,4 @@
-name: Build & Deploy to releases branch
+name: Build ZIP & Push to releases branch
 
 on:
   push:
@@ -9,7 +9,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      - name: Checkout code from main
         uses: actions/checkout@v4
 
       - name: Install zip
@@ -27,19 +27,18 @@ jobs:
 
       - name: Checkout releases branch
         run: |
-          mkdir -p ../releases
-          cd ../releases
-          git init
-          git remote add origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
-          git fetch origin releases
-          git checkout -b releases origin/releases || git checkout -b releases
+          git clone --single-branch --branch releases https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }} releases
+          cp release.zip releases/
+          cd releases
 
-      - name: Replace and commit new release.zip
+      - name: Commit and Push to releases branch
         run: |
-          cd ../releases
-          cp ../build/releasе.zip .
-          git add release.zip
+          cd releases
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git commit -m "Update release.zip" || echo "No changes to commit"
+
+          git add release.zip
+          git diff --staged --quiet && echo "No changes in release.zip" || git commit -m "Update release.zip"
+          
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
           git push origin releases --force
