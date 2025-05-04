@@ -38,6 +38,6 @@ jobs:
           git config --local user.name "GitHub Action"
           git add release.zip
           git commit -m "Update release.zip"
-          git push origin gh-pages
+          git push origin main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
