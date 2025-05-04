@@ -1,33 +1,45 @@
-name: Build Chrome Extension ZIP
+name: Build & Update release.zip in main branch
 
 on:
   push:
     branches:
       - main
+  schedule:
+    - cron: "0 * * * *" # можно запускать по расписанию (раз в час)
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout код
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Установка zip
+      - name: Install zip
         run: sudo apt-get install -y zip
 
-      - name: Сборка .zip
+      - name: Build release.zip
         run: |
-          zip -r release.zip \
+          zip -r new-release.zip \
             popup.html \
             background.js \
             popup.js \
             style.css \
             manifest.json \
             icon.png
-            
 
-      - name: Выложить как артефакт
-        uses: actions/upload-artifact@v3
-        with:
-          name: release
-          path: release.zip
+      - name: Replace old release.zip
+        run: |
+          mv new-release.zip release.zip
+
+      - name: Commit and Push updated release.zip
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+
+          # Проверяем, изменился ли файл
+          git add release.zip
+          git diff --staged --quiet && echo "Нет изменений в release.zip" && exit 0
+
+          git commit -m "Update release.zip"
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
+          git push origin main
