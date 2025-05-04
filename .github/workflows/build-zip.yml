@@ -1,0 +1,33 @@
+name: Build Chrome Extension ZIP
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout код
+        uses: actions/checkout@v4
+
+      - name: Установка zip
+        run: sudo apt-get install -y zip
+
+      - name: Сборка .zip
+        run: |
+          zip -r release.zip \
+            popup.html \
+            background.js \
+            popup.js \
+            style.css \
+            manifest.json \
+            icon.png
+            
+
+      - name: Выложить как артефакт
+        uses: actions/upload-artifact@v3
+        with:
+          name: release
+          path: release.zip

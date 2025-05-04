@@ -166,4 +166,4 @@ function fetchLivePing() {
 }
 
 setInterval(fetchLivePing, 5000);
-fetchLivePing(); // сразу при загрузке
+fetchLivePing(); // сразу при загрузкеч
