@@ -1,4 +1,4 @@
-name: Build & Deploy ZIP
+name: Build & Deploy ZIP to GitHub Pages
 
 on:
   push:
