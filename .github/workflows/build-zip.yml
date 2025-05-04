@@ -1,4 +1,4 @@
-name: Build Chrome Extension ZIP
+name: Build & Deploy ZIP to GitHub Pages
 
 on:
   push:
@@ -9,13 +9,13 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout код
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Установка zip
+      - name: Install zip
         run: sudo apt-get install -y zip
 
-      - name: Сборка .zip
+      - name: Build release.zip
         run: |
           zip -r release.zip \
             popup.html \
@@ -24,10 +24,20 @@ jobs:
             style.css \
             manifest.json \
             icon.png
-            
 
-      - name: Выложить как артефакт
-        uses: actions/upload-artifact@v3
-        with:
-          name: release
-          path: release.zip
+      - name: Clone GitHub Pages branch
+        run: |
+          mkdir pages
+          cd pages
+          git init
+          git remote add origin https://github.com/${{ github.repository }}.git
+          git fetch origin gh-pages
+          git checkout origin/gh-pages
+          cp ../release.zip .
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add release.zip
+          git commit -m "Update release.zip"
+          git push origin gh-pages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
