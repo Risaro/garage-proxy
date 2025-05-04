@@ -25,19 +25,16 @@ jobs:
             manifest.json \
             icon.png
 
-      - name: Clone GitHub Pages branch
+      - name: Setup Git
         run: |
-          mkdir pages
+          git config --global user.email "github-actions@example.com"
+          git config --global user.name "GitHub Actions"
+
+      - name: Clone gh-pages branch
+        run: |
+          git clone --single-branch --branch gh-pages https://github.com/${{ github.repository }} pages
           cd pages
-          git init
-          git remote add origin https://github.com/${{ github.repository }}.git
-          git fetch origin gh-pages
-          git checkout origin/gh-pages
           cp ../release.zip .
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
           git add release.zip
           git commit -m "Update release.zip"
           git push origin gh-pages
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
