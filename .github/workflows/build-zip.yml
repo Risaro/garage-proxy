@@ -1,11 +1,9 @@
-name: Build & Update release.zip in main branch
+name: Build & Deploy to releases branch
 
 on:
   push:
     branches:
       - main
-  schedule:
-    - cron: "0 * * * *" # раз в час
 
 jobs:
   build:
@@ -19,7 +17,7 @@ jobs:
 
       - name: Build release.zip
         run: |
-          zip -r new-release.zip \
+          zip -r release.zip \
             popup.html \
             background.js \
             popup.js \
@@ -27,19 +25,21 @@ jobs:
             manifest.json \
             icon.png
 
-      - name: Replace old release.zip
-        run: mv new-release.zip release.zip
-
-      - name: Commit and Push updated release.zip
+      - name: Checkout releases branch
         run: |
+          mkdir -p ../releases
+          cd ../releases
+          git init
+          git remote add origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
+          git fetch origin releases
+          git checkout -b releases origin/releases || git checkout -b releases
+
+      - name: Replace and commit new release.zip
+        run: |
+          cd ../releases
+          cp ../build/releasе.zip .
+          git add release.zip
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-
-          git add release.zip
-
-          # Проверяем, есть ли изменения
-          git diff --staged --quiet && echo "release.zip не изменился" && exit 0
-
-          git commit -m "Update release.zip"
-          git remote set-url origin https://x-access-token:${{ secrets.GH_PAT }}@github.com/${{ github.repository }}
-          git push origin main
+          git commit -m "Update release.zip" || echo "No changes to commit"
+          git push origin releases --force
