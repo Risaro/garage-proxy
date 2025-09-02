@@ -1,6 +1,6 @@
 {
   "name": "GarageTesla Proxy",
-  "version": "1.0",
+  "version": "1.1",
   "description": "Прокси через Chrome Extension с авто-восстановлением.",
   "manifest_version": 3,
 

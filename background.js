@@ -1,151 +1,115 @@
-// Интервал проверки: 15 минут = 900000 мс
-const CHECK_INTERVAL = 15 * 60 * 1000;
-
-// URL для проверки доступности через прокси
-const TEST_URL = 'https://www.google.ru';
-
-// Настройки твоего прокси
-const proxyConfig = {
-  mode: "fixed_servers",
-  rules: {
-    singleProxy: {
-      scheme: "http",
-      host: "185.125.101.148", // замени на свой
-      port: 1609
-    },
-    bypassList: ["localhost"]
-  }
-};
-
+// Текущее состояние прокси
 let proxyHealth = {
   status: 'Неизвестно',
   ping: '-',
-  lastCheck: null,
-  nextCheckAt: Date.now() + CHECK_INTERVAL
+  lastCheck: null
 };
 
-// Функция проверки доступности сайта через прокси
-async function checkProxy() {
-  proxyHealth.status = 'Проверяется...';
-  broadcastHealth();
-
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // Таймаут 10 секунд
-
-    const start = Date.now();
-
-    const response = await fetch(TEST_URL, {
-      method: 'HEAD',
-      mode: 'no-cors', // важно для проверки доступности
-      signal: controller.signal
-    });
-
-    clearTimeout(timeoutId);
-
-    const end = Date.now();
-
-    if (response.ok) {
-      proxyHealth.status = 'Стабильно';
-      proxyHealth.ping = end - start;
-      proxyHealth.lastCheck = new Date();
-      proxyHealth.nextCheckAt = Date.now() + CHECK_INTERVAL;
-      console.log('[Proxy] Работает нормально');
-      return true;
+// Сохраняем состояние в storage
+function saveState() {
+  chrome.storage.local.set({
+    proxyHealth: {
+      status: proxyHealth.status,
+      ping: proxyHealth.ping,
+      lastCheck: proxyHealth.lastCheck ? proxyHealth.lastCheck.toString() : null
     }
+  });
+}
 
-    console.warn('[Proxy] Неожиданный ответ:', response.status);
-    proxyHealth.status = 'Ошибка';
-    proxyHealth.ping = '–';
-    return false;
+// Восстанавливаем состояние из storage
+function restoreState() {
+  chrome.storage.local.get('proxyHealth', (res) => {
+    if (res.proxyHealth) {
+      proxyHealth = {
+        status: res.proxyHealth.status,
+        ping: res.proxyHealth.ping,
+        lastCheck: res.proxyHealth.lastCheck ? new Date(res.proxyHealth.lastCheck) : null
+      };
+      broadcastHealth();
+    }
+  });
+}
 
-  } catch (error) {
-    console.error('[Proxy] Ошибка проверки:', error.message);
-    proxyHealth.status = 'Ошибка';
-    proxyHealth.ping = '–';
-    return false;
+// Отправка данных в popup
+function broadcastHealth() {
+  try {
+    chrome.runtime.sendMessage({
+      type: 'proxyHealthUpdate',
+      ...proxyHealth
+    });
+  } catch (e) {
+    // Popup не подключен, ничего страшного
   }
 }
 
-// Переподключение к прокси
-function reconnectProxy() {
-  chrome.proxy.settings.set({
-    value: proxyConfig,
-    scope: "regular"
-  }, () => {
-    console.log('[Proxy] Прокси переподключён');
-    chrome.storage.local.set({ proxyEnabled: true });
-  });
-}
-
-// Основной цикл проверки
-async function startHealthCheck() {
-  chrome.storage.local.get(['proxyEnabled'], async ({ proxyEnabled }) => {
-    if (!proxyEnabled) {
-      console.log('[Background] Прокси выключен. Проверка остановлена.');
-      return;
-    }
-
-    proxyHealth.status = 'Проверяется...';
+// Простая проверка (быстрая)
+function quickCheck() {
+  proxyHealth.status = 'Проверяется...';
+  broadcastHealth();
+  
+  const start = Date.now();
+  
+  fetch('https://www.google.com/generate_204', {
+    mode: 'no-cors',
+    cache: 'no-store'
+  }).then(() => {
+    const end = Date.now();
+    proxyHealth.status = 'Стабильно';
+    proxyHealth.ping = end - start;
+    proxyHealth.lastCheck = new Date();
     broadcastHealth();
-
-    const isWorking = await checkProxy();
-
-    if (!isWorking) {
-      console.log('[Proxy] Проблемы с прокси. Переподключаем...');
-      reconnectProxy();
-    }
+    saveState();
+  }).catch(error => {
+    proxyHealth.status = 'Ошибка';
+    proxyHealth.ping = '–';
+    broadcastHealth();
+    saveState();
   });
 }
 
-// Отправляем данные в popup
-function broadcastHealth() {
-  chrome.runtime.connect().postMessage({
-    type: 'proxyHealth',
-    ...proxyHealth
-  });
-}
-
-// Для запросов из popup
+// Обработчик сообщений
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.action === "getProxyHealth") {
-    const now = Date.now();
-    const nextCheckIn = proxyHealth.nextCheckAt - now;
     sendResponse({
       status: proxyHealth.status,
-      ping: proxyHealth.ping,
-      nextCheckIn: nextCheckIn > 0 ? nextCheckIn : 0
+      ping: proxyHealth.ping
     });
+    return true;
   }
 
   if (msg.action === "runHealthCheckNow") {
-    console.log('[Background] Запущена немедленная проверка...');
-    checkProxy().then(isWorking => {
-      if (!isWorking) {
-        reconnectProxy();
-      }
-      broadcastHealth(); // Обновляем UI
-    });
+    quickCheck();
+    return true;
   }
 
   if (msg.action === "getPingNow") {
-    // Отправляем последний известный пинг
     sendResponse({
       ping: proxyHealth.ping === '-' || proxyHealth.ping === '–' ? null : proxyHealth.ping
     });
+    return true;
   }
 
   if (msg.action === "proxyDisabled") {
-    console.log('[Background] Прокси выключен. Сбрасываем состояние...');
-    proxyHealth.status = 'отключено';
-    proxyHealth.ping = '-';
-    proxyHealth.nextCheckAt = null;
+    proxyHealth = {
+      status: 'отключено',
+      ping: '-',
+      lastCheck: null
+    };
     broadcastHealth();
+    saveState();
+    return true;
   }
 });
 
-// Запуск периодической проверки
+// Инициализация
 chrome.runtime.onInstalled.addListener(() => {
-  setInterval(startHealthCheck, CHECK_INTERVAL);
-  startHealthCheck(); // запустить сразу после установки
+  restoreState();
 });
+
+// Восстанавливаем состояние при старте
+chrome.runtime.onStartup.addListener(() => {
+  restoreState();
+});
+
+// Восстанавливаем состояние сразу
+restoreState();

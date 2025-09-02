@@ -6,14 +6,6 @@ const currIP = document.getElementById('curr-ip');
 
 // Элементы UI для состояния
 const connectionStatus = document.getElementById('connection-status');
-const pingResult = document.getElementById('ping-result');
-const nextCheckTimer = document.getElementById('next-check-timer');
-
-// Выбор типа прокси
-const proxyTypeSelect = document.getElementById('proxyTypeSelect');
-
-// Блок обновления
-const updateNotice = document.getElementById('updateNotice');
 
 // Переключение вкладок
 document.querySelectorAll('.tab').forEach(tab => {
@@ -22,83 +14,92 @@ document.querySelectorAll('.tab').forEach(tab => {
 
     // Удалить активные классы
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+    document.querySelectorAll('.tab-content').forEach(c => {
+      c.classList.add('hidden');
+      c.classList.remove('active');
+    });
 
     // Активировать нужную вкладку
     tab.classList.add('active');
-    document.getElementById(target).classList.remove('hidden');
-    document.getElementById(target).classList.add('active');
+    const targetElement = document.getElementById(target);
+    targetElement.classList.remove('hidden');
+    targetElement.classList.add('active');
   });
 });
 
 // Загрузка состояния при запуске
-chrome.storage.local.get(['proxyEnabled', 'proxyType'], ({ proxyEnabled, proxyType }) => {
-  updateUI(proxyEnabled);
-  proxyTypeSelect.value = proxyType || 'http';
-});
-
-// Сохраняем выбранный тип прокси
-proxyTypeSelect.addEventListener('change', () => {
-  const selectedType = proxyTypeSelect.value;
-  chrome.storage.local.set({ proxyType: selectedType });
-});
+function loadState() {
+  chrome.storage.local.get(['proxyEnabled', 'proxyHealth'], ({ proxyEnabled, proxyHealth }) => {
+    updateUI(proxyEnabled);
+    
+    if (proxyHealth) {
+      connectionStatus.textContent = proxyHealth.status;
+      
+      // Цвет статуса
+      connectionStatus.className = '';
+      if (proxyHealth.status === 'Проверяется...') {
+        connectionStatus.classList.add('connection-checking');
+      } else if (!proxyHealth.status.includes('Стабильно')) {
+        connectionStatus.classList.add('connection-bad');
+      }
+    }
+    
+    // Запрашиваем актуальные данные
+    requestBackgroundData();
+  });
+}
 
 // Переключатель прокси
 toggleBtn.addEventListener('click', () => {
-  chrome.storage.local.get(['proxyEnabled', 'proxyType'], ({ proxyEnabled, proxyType }) => {
+  chrome.storage.local.get(['proxyEnabled'], ({ proxyEnabled }) => {
     const newState = !proxyEnabled;
     chrome.storage.local.set({ proxyEnabled: newState });
 
     if (newState) {
-      let scheme = proxyType === 'socks5' ? 'socks5' : 'http';
-      let port = proxyType === 'socks5' ? 1080 : 1609;
-
+      // Мгновенно обновляем интерфейс
+      updateUI(true);
+      connectionStatus.textContent = 'Проверяется...';
+      connectionStatus.className = 'connection-checking';
+      
       chrome.proxy.settings.set({
         value: {
           mode: "fixed_servers",
           rules: {
             singleProxy: {
-              scheme: scheme,
-              host: "185.125.101.148", // <-- ЗАМЕНИ НА СВОЙ ПРОКСИ
-              port: port
+              scheme: "socks5",
+              host: "88.218.120.66",  // Твой сервер
+              port: 80                 // Порт 80
             },
             bypassList: ["localhost"]
           }
         },
         scope: "regular"
       }, () => {
-        updateUI(true);
-        updateIPInfo(); // показать IP
-
-        // Запрашиваем немедленную проверку
-        chrome.runtime.sendMessage({ action: "runHealthCheckNow" }, () => {
-          console.log('[Popup] Запрошена немедленная проверка');
-        });
+        // Запрашиваем проверку
+        chrome.runtime.sendMessage({ action: "runHealthCheckNow" });
+        updateIPInfo();
       });
     } else {
+      // Мгновенно обновляем интерфейс
+      updateUI(false);
+      connectionStatus.textContent = 'отключено';
+      connectionStatus.className = '';
+      ipInfoBlock.classList.add("hidden");
+      
       chrome.proxy.settings.clear({ scope: "regular" }, () => {
-        updateUI(false);
-        ipInfoBlock.classList.add("hidden");
-
-        // === Отправляем сообщение о выключении ===
         chrome.runtime.sendMessage({ action: "proxyDisabled" });
       });
     }
   });
 });
 
+// Обновление UI
 function updateUI(enabled) {
   statusEl.textContent = enabled ? "Статус: включено" : "Статус: отключено";
   toggleBtn.textContent = enabled ? "Отключить" : "Включить";
-
-  if (!enabled) {
-    connectionStatus.textContent = 'отключено';
-    connectionStatus.className = '';
-    pingResult.textContent = '-';
-    nextCheckTimer.textContent = '-';
-  }
 }
 
+// Получение текущего IP
 async function getCurrentIP() {
   try {
     const res = await fetch('https://api.ipify.org?format=json');
@@ -109,6 +110,7 @@ async function getCurrentIP() {
   }
 }
 
+// Обновление информации об IP
 async function updateIPInfo() {
   const current = await getCurrentIP();
 
@@ -117,7 +119,6 @@ async function updateIPInfo() {
     prevIP.textContent = previous;
     currIP.textContent = current;
     ipInfoBlock.classList.remove("hidden");
-
     chrome.storage.local.set({ lastIP: current });
   });
 }
@@ -127,92 +128,27 @@ function requestBackgroundData() {
   chrome.runtime.sendMessage({ action: "getProxyHealth" }, (response) => {
     if (response && response.status) {
       connectionStatus.textContent = response.status;
-      pingResult.textContent = response.ping + ' мс';
 
-      if (response.status === 'Стабильно') {
-        connectionStatus.className = '';
-      } else if (response.status === 'Проверяется...') {
-        connectionStatus.className = 'connection-checking';
-      } else {
-        connectionStatus.className = 'connection-bad';
-      }
-
-      if (response.nextCheckIn !== undefined) {
-        let timeLeft = Math.max(0, Math.floor(response.nextCheckIn / 1000));
-        const minutes = Math.floor(timeLeft / 60);
-        const seconds = timeLeft % 60;
-        nextCheckTimer.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+      // Цвет статуса
+      connectionStatus.className = '';
+      if (response.status === 'Проверяется...') {
+        connectionStatus.classList.add('connection-checking');
+      } else if (!response.status.includes('Стабильно')) {
+        connectionStatus.classList.add('connection-bad');
       }
     }
   });
 }
 
-// Запрашиваем состояние каждые 2 секунды
-setInterval(requestBackgroundData, 2000);
-requestBackgroundData();
+// Загружаем состояние при старте
+document.addEventListener('DOMContentLoaded', loadState);
 
-// === Добавлено: обновление пинга каждые 5 секунд (только если прокси включён) ===
-function fetchLivePing() {
-  chrome.storage.local.get(['proxyEnabled'], ({ proxyEnabled }) => {
-    if (!proxyEnabled) {
-      pingResult.textContent = '-';
-      return;
-    }
-
-    chrome.runtime.sendMessage({ action: "getPingNow" }, (response) => {
-      if (response && response.ping !== undefined) {
-        const pingText = response.ping !== null ? `${response.ping} мс` : '–';
-        pingResult.textContent = pingText;
-      }
-    });
-  });
-}
-
-setInterval(fetchLivePing, 5000);
-fetchLivePing(); // сразу при загрузке
-
-// === Автообновление расширения ===
-
-// Проверка обновлений при загрузке popup
-window.addEventListener('load', checkForUpdate);
-
-// Функция сравнения версий
-function compareVersions(v1, v2) {
-  const parts1 = v1.split('.').map(Number);
-  const parts2 = v2.split('.').map(Number);
-
-  for (let i = 0; i < 3; i++) {
-    if (parts1[i] > parts2[i]) return 1;
-    if (parts1[i] < parts2[i]) return -1;
+// Обновляем данные при открытии popup
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    loadState();
   }
-  return 0;
-}
+});
 
-// Проверка обновления
-async function checkForUpdate() {
-  try {
-    const response = await fetch('https://risaro.github.io/garage-proxy/version.json');
-    const remote = await response.json();
-
-    const currentVersion = chrome.runtime.getManifest().version;
-    const latestVersion = remote.version;
-
-    if (compareVersions(currentVersion, latestVersion) < 0) {
-      showUpdateNotification(remote);
-    }
-  } catch (e) {
-    console.error("Ошибка проверки обновления:", e);
-  }
-}
-
-// Показываем уведомление об обновлении
-function showUpdateNotification(data) {
-  updateNotice.style.display = 'block';
-  updateNotice.innerHTML = `
-    <h3>🆕 Доступно обновление</h3>
-    <p><strong>Текущая:</strong> ${chrome.runtime.getManifest().version}</p>
-    <p><strong>Новая:</strong> ${data.version}</p>
-    <p id="changelog">${data.changelog}</p>
-    <a id="downloadLink" href="${data.download_url}" target="_blank">📥 Скачать новую версию</a>
-  `;
-}
+// Проверка каждые 10 секунд
+setInterval(requestBackgroundData, 10000);
